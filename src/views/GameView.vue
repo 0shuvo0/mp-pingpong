@@ -1,5 +1,12 @@
 <template>
     <div class="game-page">
+        <div class="ready-stats">
+            <p class="ready-stats-payer1">
+                <button @click="markUserReady" class="btn" v-if="!userReady">I am ready!</button>
+                <span class="d-inline-block mb-05" v-else>waiting for opponent ...</span>
+            </p>
+            <p class="ready-stats-payer2">Your opponent is <span class="blue" v-if="opponentReady">ready!</span><span class="red" v-else>not ready!</span></p>
+        </div>
         <p class="game-score">
             <span class="red">0</span>
             <span class="vs">VS</span>
@@ -59,6 +66,8 @@ export default {
     },
     data(){
         return {
+            userReady: false,
+            opponentReady: false,
             ctx: null,
             ballData: {
                 x: 50,
@@ -76,8 +85,8 @@ export default {
         }
     },
     mounted(){
-        this.setupGame()
-        this.startGame()
+        // this.setupGame()
+        // this.startGame()
         window.addEventListener('resize', this.setCanvasSize)
         window.addEventListener('keydown', this.handleKeydown)
     },
@@ -150,6 +159,9 @@ export default {
         handleKeydown(e){
             if(e.key === 'ArrowUp') this.movePad('up')
             if(e.key === 'ArrowDown') this.movePad('down')
+        },
+        markUserReady(){
+            this.userReady = true
         }
     }
 }
@@ -251,5 +263,24 @@ export default {
         left: 0;
         z-index: 9;
     }
+}
+
+.ready-stats{
+    text-align: center;
+    margin-bottom: 2em;
+}
+.ready-stats-payer1 .btn{
+    margin-bottom: 1em;
+    width: 200px;
+}
+.ready-stats-payer2 span{
+    font-weight: 600;
+    font-style: italic;
+}
+.ready-stats-payer2 span.red{
+    color: rgb(214, 50, 50);
+}
+.ready-stats-payer2 span.blue{
+    color: #3dcbff;
 }
 </style>

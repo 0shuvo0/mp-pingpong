@@ -72,7 +72,7 @@ export default {
             rightPadData: {
                 y: 60
             },
-            playingOn: 'left'
+            playingOn: this.$route.query.userType === 'challanger' ? 'right' : 'left'
         }
     },
     mounted(){
@@ -83,6 +83,7 @@ export default {
     },
     beforeDestroy(){
         window.removeEventListener('resize', this.setCanvasSize)
+        window.removeEventListener('keydown', this.handleKeydown)
     },
     methods: {
         setupGame(){

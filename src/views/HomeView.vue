@@ -10,7 +10,7 @@
       >{{copyBtnText}}</span>
     </div>
     <div class="input-group w-btn">
-      <input type="text" placeholder="Enter opponent id" class="input-group-input">
+      <input v-model="opponentId" type="text" placeholder="Enter opponent id" class="input-group-input">
       <button class="btn" @click="connectPlayers">connect</button>
     </div>
   </div>
@@ -21,15 +21,23 @@ export default {
   data(){
     return {
       userId: '',
+      opponentId: '',
       copyBtnText: 'copy id'
     }
   },
   sockets: {
     connect: function () {
       console.log('socket connected')
-    },
-    myId(id){
       this.userId = this.$socket.id
+    },
+    roomCreated({roomId, userType}){
+      this.$router.push({
+        path: '/game',
+        query: {
+          roomId,
+          userType
+        }
+      })
     }
   },
   methods: {
@@ -42,7 +50,11 @@ export default {
       }, 1000)
     },
     connectPlayers(){
-      this.$router.push({ path: '/game' })
+      if(!this.opponentId) return
+      this.$socket.emit('createRoom', {
+        userId: this.userId,
+        opponentId: this.opponentId
+      })
     }
   }
 }

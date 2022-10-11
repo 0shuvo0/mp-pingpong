@@ -3,6 +3,7 @@
         <div class="ready-stats">
             <p class="ready-stats-payer1">
                 <button @click="markUserReady" class="btn" v-if="!userReady">I am ready!</button>
+                <span class="d-inline-block mb-05" v-else-if="userReady && opponentReady">The game has began!!!</span>
                 <span class="d-inline-block mb-05" v-else>waiting for opponent ...</span>
             </p>
             <p class="ready-stats-payer2">Your opponent is <span class="blue" v-if="opponentReady">ready!</span><span class="red" v-else>not ready!</span></p>
@@ -84,9 +85,19 @@ export default {
             playingOn: this.$route.query.userType === 'challanger' ? 'right' : 'left'
         }
     },
+    sockets: {
+        opponentReady(){
+            this.opponentReady = true
+        },
+        startGame({ballData, leftPadData, rightPadData}){
+            this.ballData = ballData
+            this.leftPadData = this.playingOn === 'left' ? leftPadData : rightPadData
+            this.rightPadData = this.playingOn === 'right' ? leftPadData : rightPadData
+            this.setupGame()
+            this.startGame()
+        }
+    },
     mounted(){
-        // this.setupGame()
-        // this.startGame()
         window.addEventListener('resize', this.setCanvasSize)
         window.addEventListener('keydown', this.handleKeydown)
     },
@@ -99,14 +110,14 @@ export default {
             const canvas = this.$refs.gameCanvas
             this.setCanvasSize()
             this.ctx = canvas.getContext('2d')
-            this.ballData.x = 50 + (Math.random() * (canvas.width - 100))
-            this.ballData.y = 50 + (Math.random() * (canvas.height - 100))
-            if(Math.random() > .5) this.ballData.vx *= -1
-            if(Math.random() > .5) this.ballData.vy *= -1
+            // this.ballData.x = 50 + (Math.random() * (canvas.width - 100))
+            // this.ballData.y = 50 + (Math.random() * (canvas.height - 100))
+            // if(Math.random() > .5) this.ballData.vx *= -1
+            // if(Math.random() > .5) this.ballData.vy *= -1
 
-            const padY = (canvas.height / 2) - (PAD_HEIGHT / 2)
-            this.leftPadData.y = padY
-            this.rightPadData.y = padY
+            // const padY = (canvas.height / 2) - (PAD_HEIGHT / 2)
+            // this.leftPadData.y = padY
+            // this.rightPadData.y = padY
         },
         setCanvasSize(){
             const board = this.$refs.gameBoard
@@ -161,6 +172,7 @@ export default {
             if(e.key === 'ArrowDown') this.movePad('down')
         },
         markUserReady(){
+            this.$socket.emit(this.$route.query.userType === 'challanger' ? 'playerReady' : 'opponentReady', this.$route.query.roomId)
             this.userReady = true
         }
     }

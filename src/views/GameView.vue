@@ -9,16 +9,16 @@
             <p class="ready-stats-payer2">Your opponent is <span class="blue" v-if="opponentReady">ready!</span><span class="red" v-else>not ready!</span></p>
         </div>
         <p class="game-score">
-            <span class="red">0</span>
+            <span class="red">{{score.opponent}}</span>
             <span class="vs">VS</span>
-            <span class="blue">0</span>
+            <span class="blue">{{score.user}}</span>
         </p>
         <div class="game-board-container">
-            <GameControls
+            <!-- <GameControls
              color="#f00"
              @btnClick="movePad"
              v-if="playingOn === 'left'"
-            />
+            /> -->
             <div class="game-board" ref="gameBoard">
                 <div class="decorative-border top-left">
                     <img src="@/assets/bar_red_2.png" alt="">
@@ -35,12 +35,22 @@
 
                 <canvas class="game-canvas" ref="gameCanvas"></canvas>
             </div>
-            <GameControls
+            <!-- <GameControls
              color="#3dcbff"
              @btnClick="movePad"
              v-if="playingOn === 'right'"
-            />
+            /> -->
         </div>
+        <GameControls
+            :color="playingOn === 'left' ? '#f00' : '#3dcbff'"
+            @btnClick="movePad"
+        />
+        <GameOverModal
+         v-if="gameOver"
+         :score="score"
+         :winner="winner"
+         :playerIs="playingOn === 'right' ? 'user' : 'opponent'"
+        />
     </div>
 </template>
 
@@ -49,6 +59,11 @@ import GameControls from '@/components/GameControls.vue'
 
 import leftPadChar from '@/assets/pong3-red.png'
 import rightPadChar from '@/assets/pong3-blue.png'
+import GameOverModal from '../components/GameOverModal.vue'
+
+import scoreUpdate from '@/assets/scoreUpdate.wav'
+
+const scoreUpdateSound = new Audio(scoreUpdate)
 
 const leftPadImg = new Image()
 leftPadImg.src = leftPadChar
@@ -57,14 +72,43 @@ const rightPadImg = new Image()
 rightPadImg.src = rightPadChar
 
 const BALL_RADUIS = 10
-const PAD_WIDTH = 20
-const PAD_HEIGHT = 60
-const PAD_MOVE_SPEED = 20
+
+const PAD_O_WIDTH = 4
+const PAD_O_HEIGHT = 20
+let PAD_WIDTH = 20
+let PAD_HEIGHT = 60
+const PAD_MOVE_SPEED = 10
+const PAD_MARGIN = 2
+
+
+function percentage(totalValue, percentage){
+   return totalValue * (percentage / 100)
+}
+
+function getXYCoord(canvas, hX, hY){
+    const height = canvas.height
+    const width = canvas.width
+    const x = percentage(width, hX)
+    const y = percentage(height, hY)
+
+    return {x, y}
+}
+
+function checkCollision(bx, by, px, py){
+    let Xn = Math.max(px, Math.min(bx, px + PAD_WIDTH));
+    let Yn = Math.max(py, Math.min(by, py + PAD_HEIGHT));
+    let Dx = Xn - bx
+    let Dy = Yn - by
+    const R = BALL_RADUIS
+
+    return (Dx * Dx + Dy * Dy) <= R * R
+}
 
 export default {
     components: {
-        GameControls
-    },
+    GameControls,
+    GameOverModal
+},
     data(){
         return {
             userReady: false,
@@ -73,16 +117,22 @@ export default {
             ballData: {
                 x: 50,
                 y: 50,
-                vx: Math.random() + 2,
-                vy: Math.random() + 2
+                vx: Math.max(.6, Math.random() + .2),
+                vy: Math.max(.6, Math.random() + .2)
             },
             leftPadData: {
-                y: 30
+                y: 40
             },
             rightPadData: {
-                y: 60
+                y: 40
             },
-            playingOn: this.$route.query.userType === 'challanger' ? 'right' : 'left'
+            playingOn: this.$route.query.userType === 'challanger' ? 'right' : 'left',
+            score: {
+                user: 0,
+                opponent: 0
+            },
+            gameOver: false,
+            winnner: ''
         }
     },
     sockets: {
@@ -95,9 +145,38 @@ export default {
             this.rightPadData = this.playingOn === 'right' ? leftPadData : rightPadData
             this.setupGame()
             this.startGame()
+        },
+        opponentPadMove(direction){
+            const canvas = this.$refs.gameCanvas
+            const data = this[this.playingOn === 'right' ? 'leftPadData' : 'rightPadData']
+            data.y += direction === 'up' ? -PAD_MOVE_SPEED : PAD_MOVE_SPEED
+            if(data.y < 0) data.y = 0
+            if(percentage(canvas.height, data.y) > canvas.height - PAD_HEIGHT) data.y = (100 * (canvas.height - PAD_HEIGHT)) / canvas.height
+        },
+        scoreUpdate(score){
+            this.score = score
+        },
+        gameOver({score, winner}){
+            this.score = score
+            this.winner = winner
+            this.gameOver = true
         }
     },
+    // watch: {
+    //     score: {
+    //         handler(){
+    //             scoreUpdateSound.play()
+    //         },
+    //         deep: true
+    //     }
+    // },
     mounted(){
+        const canvas = this.$refs.gameCanvas
+        const height = canvas.height
+        const width = canvas.width
+        PAD_HEIGHT = percentage(height, PAD_O_HEIGHT)
+        PAD_WIDTH = percentage(width, PAD_O_WIDTH)
+        
         window.addEventListener('resize', this.setCanvasSize)
         window.addEventListener('keydown', this.handleKeydown)
     },
@@ -110,25 +189,23 @@ export default {
             const canvas = this.$refs.gameCanvas
             this.setCanvasSize()
             this.ctx = canvas.getContext('2d')
-            // this.ballData.x = 50 + (Math.random() * (canvas.width - 100))
-            // this.ballData.y = 50 + (Math.random() * (canvas.height - 100))
-            // if(Math.random() > .5) this.ballData.vx *= -1
-            // if(Math.random() > .5) this.ballData.vy *= -1
-
-            // const padY = (canvas.height / 2) - (PAD_HEIGHT / 2)
-            // this.leftPadData.y = padY
-            // this.rightPadData.y = padY
         },
         setCanvasSize(){
             const board = this.$refs.gameBoard
             const canvas = this.$refs.gameCanvas
             canvas.height = board.clientHeight
             canvas.width = board.clientWidth
+            const height = canvas.height
+            const width = canvas.width
+            PAD_HEIGHT = percentage(height, PAD_O_HEIGHT)
+            PAD_WIDTH = percentage(width, PAD_O_WIDTH)
         },
         drawBall(){
+            const canvas = this.$refs.gameCanvas
             const ctx = this.ctx
             ctx.beginPath()
-            ctx.arc(this.ballData.x, this.ballData.y, BALL_RADUIS, 0, Math.PI * 2)
+            const {x, y} = getXYCoord(canvas, this.ballData.x, this.ballData.y)
+            ctx.arc(x, y, BALL_RADUIS, 0, Math.PI * 2)
             ctx.fillStyle = '#fff'
             ctx.fill()
         },
@@ -136,14 +213,17 @@ export default {
             const canvas = this.$refs.gameCanvas
             const ctx = this.ctx
             
+            const {x: x1, y: y1} = getXYCoord(canvas, PAD_MARGIN, this.leftPadData.y)
             ctx.beginPath()
-            ctx.drawImage(leftPadImg, 10, this.leftPadData.y, PAD_WIDTH, PAD_HEIGHT)
+            ctx.drawImage(leftPadImg, x1, y1, PAD_WIDTH, PAD_HEIGHT)
             
+            const {x: x2, y: y2} = getXYCoord(canvas, PAD_MARGIN, this.rightPadData.y)
             ctx.beginPath()
-            ctx.drawImage(rightPadImg, canvas.width - 10 - PAD_WIDTH, this.rightPadData.y, PAD_WIDTH, PAD_HEIGHT)
+            ctx.drawImage(rightPadImg, canvas.width - x2 - PAD_WIDTH, y2, PAD_WIDTH, PAD_HEIGHT)
         },
         startGame(){
             this.render()
+            if(this.gameOver) return
             requestAnimationFrame(this.startGame)
         },
         render(){
@@ -157,15 +237,71 @@ export default {
             const canvas = this.$refs.gameCanvas
             this.ballData.x += this.ballData.vx
             this.ballData.y += this.ballData.vy
-            if(this.ballData.x < BALL_RADUIS || this.ballData.x + BALL_RADUIS > canvas.width) this.ballData.vx *= -1
-            if(this.ballData.y < BALL_RADUIS || this.ballData.y + BALL_RADUIS > canvas.height) this.ballData.vy *= -1
+            const {x, y} = getXYCoord(canvas, this.ballData.x, this.ballData.y)
+            const {x: plx, y: ply} = getXYCoord(canvas, PAD_MARGIN, this.leftPadData.y)
+            const {x: prx, y: pry} = getXYCoord(canvas, PAD_MARGIN, this.rightPadData.y)
+            
+            const leftPadConllision = checkCollision(x, y, plx, ply)
+            const rightPadConllision = checkCollision(x, y, canvas.width - prx - PAD_WIDTH, pry)
+            const isChallanger = this.$route.query.userType === 'challanger'
+            if(leftPadConllision || rightPadConllision){
+                this.ballData.vy *= -1
+            }
+            if(leftPadConllision){
+                this.ballData.vx = Math.abs(this.ballData.vx)
+            }
+            if(rightPadConllision){
+                this.ballData.vx = -Math.abs(this.ballData.vx)
+            }
+            if(x <= BALL_RADUIS){
+                console.log('left player died')
+
+                this.ctx.fillStyle = '#f00'
+                this.ctx.fillRect(0, 0, 50, canvas.height)
+                if(isChallanger){
+                    this.score.user++
+                    this.$socket.emit('scoreUpdate', {
+                        score: this.score,
+                        roomId: this.$route.query.roomId
+                    })
+                }
+            }
+            if(x + BALL_RADUIS >= canvas.width){
+
+                this.ctx.fillStyle = '#3dcbff'
+                this.ctx.fillRect(canvas.width - 50, 0, 50, canvas.height)
+                if(isChallanger){
+                    this.score.opponent++
+                    this.$socket.emit('scoreUpdate', {
+                        score: this.score,
+                        roomId: this.$route.query.roomId
+                    })
+                }
+            }
+            if(x <= BALL_RADUIS){
+                this.ballData.vx = Math.abs(this.ballData.vx)
+            }
+            if(x + BALL_RADUIS >= canvas.width){
+                this.ballData.vx = -Math.abs(this.ballData.vx)
+            }
+            if(y <= BALL_RADUIS){
+                this.ballData.vy = Math.abs(this.ballData.vy)
+            }
+            if(y + BALL_RADUIS >= canvas.height){
+                this.ballData.vy = -Math.abs(this.ballData.vy)
+            }
         },
         movePad(direction){
             const canvas = this.$refs.gameCanvas
             const data = this[this.playingOn === 'left' ? 'leftPadData' : 'rightPadData']
+            this.$socket.emit('playerPadMove', {
+                roomId: this.$route.query.roomId,
+                direction,
+                player: this.$route.query.userType === 'challanger' ? 'player' : 'opponent'
+            })
             data.y += direction === 'up' ? -PAD_MOVE_SPEED : PAD_MOVE_SPEED
             if(data.y < 0) data.y = 0
-            if(data.y > canvas.height - PAD_HEIGHT) data.y = canvas.height - PAD_HEIGHT
+            if(percentage(canvas.height, data.y) > canvas.height - PAD_HEIGHT) data.y = (100 * (canvas.height - PAD_HEIGHT)) / canvas.height //
         },
         handleKeydown(e){
             if(e.key === 'ArrowUp') this.movePad('up')
@@ -248,7 +384,7 @@ export default {
         position: absolute;
         top: 0;
         left: 0;
-        transform: translate(-10%, -40%);
+        transform: translate(-10%, -41%);
         width: 45%;
         img{
             width: 100%;
@@ -264,7 +400,7 @@ export default {
         &.bottom-right{
             top: 100%;
             left: 100%;
-            transform: translate(-91%, -50%);
+            transform: translate(-91%, -53%);
         }
     }
 

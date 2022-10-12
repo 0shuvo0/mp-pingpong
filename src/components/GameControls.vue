@@ -18,8 +18,9 @@ export default {
 <style lang="scss">
 .game-board-controls{
     display: flex;
-    flex-direction: column;
-    gap: 4em
+    gap: 4em;
+    margin-top: 2em;
+    justify-content: center;
 }
 .game-board-control-btn{
     height: 60px;
